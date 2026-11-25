@@ -152,8 +152,8 @@ code.cmd{display:block;white-space:pre-wrap;word-break:break-all;background:var(
     <p class="hint">台鐵台中站和高鐵台中站（烏日）不在同一個地方，所以分開設定。</p>
 
     <h3>TDX 金鑰（交通部運輸資料平台）</h3>
-    <div class="field"><label for="fId">Client Id</label><input id="fId" autocomplete="off" spellcheck="false"></div>
-    <div class="field"><label for="fSecret">Client Secret</label><input id="fSecret" type="password" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label for="fId">Client Id</label><input id="fId" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+    <div class="field"><label for="fSecret">Client Secret</label><input id="fSecret" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
     <p class="hint">金鑰只存在這台裝置的瀏覽器裡，不會上傳到別的地方。沒填金鑰會顯示示範資料。</p>
 
     <h3>電腦排程指令（每個上班日到下班時間自動打開）</h3>
@@ -190,11 +190,13 @@ const ls = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v==null? d : JSON.parse(v);}catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
+function cleanKeyEarly(s){ return String(s||"").replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g,"-").replace(/[\s\u200B-\u200D\u2060\uFEFF]/g,""); }
 const DEF = { off:"17:00", buf:{am:{TRA:30,THSR:30}, pm:{TRA:30,THSR:30}},
   id:"", secret:"", types:{"高鐵":true,"自強":true,"莒光":true,"區間快":true,"區間":false} };
 let cfg = Object.assign({}, DEF, ls.get("cfg", {}));
 cfg.buf = Object.assign({}, DEF.buf, cfg.buf||{});
 cfg.types = Object.assign({}, DEF.types, cfg.types||{});
+if (cfg.id !== cleanKeyEarly(cfg.id) || cfg.secret !== cleanKeyEarly(cfg.secret)){ cfg.id = cleanKeyEarly(cfg.id); cfg.secret = cleanKeyEarly(cfg.secret); ls.set("cfg", cfg); ls.set("tok", null); }
 
 let dir = null;          // "am" | "pm"
 let manualDir = false;   // 使用者手動切換後就不自動換
@@ -207,6 +209,7 @@ let showAll = false;
 let demo = false;
 
 const $ = id => document.getElementById(id);
+const cleanKey = cleanKeyEarly;
 const pad = n => String(n).padStart(2,"0");
 const toMin = s => { const [h,m] = String(s).split(":").map(Number); return h*60+m; };
 const fmt = m => { m = ((Math.round(m)%1440)+1440)%1440; return pad(Math.floor(m/60))+":"+pad(m%60); };
@@ -238,7 +241,14 @@ async function getToken(){
   const body = new URLSearchParams({grant_type:"client_credentials", client_id:cfg.id, client_secret:cfg.secret});
   const r = await fetch(TDX + "/auth/realms/TDXConnect/protocol/openid-connect/token",
     {method:"POST", headers:{"content-type":"application/x-www-form-urlencoded"}, body});
-  if (!r.ok) throw new Error(r.status===400||r.status===401 ? "TDX 金鑰錯誤，請到設定檢查 Client Id／Secret" : "取得 TDX 授權失敗（"+r.status+"）");
+  if (!r.ok){
+    let why = ""; try{ const e = await r.json(); why = e.error_description || e.error || ""; }catch(e){}
+    if (r.status===400||r.status===401){
+      const hint = /client/i.test(why) ? "Client Id 或 Secret 不對" : (why || "金鑰不對");
+      throw new Error(`TDX 金鑰錯誤（${hint}）。請到 ⚙ 重新貼上；Client Id 應為「${cfg.id.slice(0,4)}…」開頭、共 ${cfg.id.length} 字，Secret 共 ${cfg.secret.length} 字，請和 TDX 網站對照。`);
+    }
+    throw new Error("取得 TDX 授權失敗（"+r.status+"）");
+  }
   const j = await r.json();
   ls.set("tok", {id:cfg.id, v:j.access_token, exp:Date.now() + (j.expires_in||3600)*1000});
   return j.access_token;
@@ -538,11 +548,12 @@ $("setForm").addEventListener("submit", ev => {
   const v = $("fOff").value;
   if (!validOff(v)){ ev.preventDefault(); $("setErr").textContent = "下班時間只能設在 12:00～21:00"; return; }
   const num = id => Math.max(0, Math.min(180, Math.round(Number($(id).value)||0)));
-  const keyChanged = cfg.id !== $("fId").value.trim() || cfg.secret !== $("fSecret").value.trim();
+  const newId = cleanKey($("fId").value), newSecret = cleanKey($("fSecret").value);
+  const keyChanged = cfg.id !== newId || cfg.secret !== newSecret;
   if (cfg.off !== v) ls.set("offFired", ""); // 改時間後今天可以再提醒一次
   cfg.off = v;
   cfg.buf = {am:{TRA:num("bAmTRA"), THSR:num("bAmTHSR")}, pm:{TRA:num("bPmTRA"), THSR:num("bPmTHSR")}};
-  cfg.id = $("fId").value.trim(); cfg.secret = $("fSecret").value.trim();
+  cfg.id = newId; cfg.secret = newSecret;
   ls.set("cfg", cfg);
   if (keyChanged){ ls.set("tok", null); trains = []; }
   render(); refresh(keyChanged);
