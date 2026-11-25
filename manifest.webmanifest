@@ -1,0 +1,16 @@
+{
+  "name": "通勤火車",
+  "short_name": "通勤火車",
+  "description": "台中⇄台北 高鐵／台鐵 即時班次與最晚出門時間",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f5f4",
+  "theme_color": "#0f5b4a",
+  "lang": "zh-Hant",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
