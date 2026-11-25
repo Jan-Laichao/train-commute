@@ -300,6 +300,7 @@ async function loadTimetable(d){
 async function loadLive(){
   const res = await Promise.allSettled([
     api("/api/basic/v3/Rail/TRA/TrainLiveBoard"),
+    api(`/api/basic/v3/Rail/TRA/StationLiveBoard/Station/${dir==="am" ? ST.TRA.tc : ST.TRA.tp}`),
     api("/api/basic/v3/Rail/TRA/Alert"),
     api("/api/basic/v2/Rail/THSR/AlertInfo")
   ]);
@@ -307,6 +308,12 @@ async function loadLive(){
     const m = {};
     for (const x of (res[0].value.TrainLiveBoards || [])) m[String(x.TrainNo)] = Number(x.DelayTime)||0;
     delays = m;
+  }
+  if (res[1].status === "fulfilled"){   // 出發站看板：還沒到站的車也能先看到誤點
+    for (const x of (res[1].value.StationLiveBoards || [])){
+      const no = String(x.TrainNo);
+      if (!(no in delays)) delays[no] = Number(x.DelayTime)||0;
+    }
   }
   const al = [];
   const pick = (arr, who) => {
@@ -318,8 +325,8 @@ async function loadLive(){
       al.push(who + "：" + text);
     }
   };
-  if (res[1].status === "fulfilled") pick(res[1].value.Alerts, "台鐵");
-  if (res[2].status === "fulfilled") pick(Array.isArray(res[2].value) ? res[2].value : res[2].value.Alerts, "高鐵");
+  if (res[2].status === "fulfilled") pick(res[2].value.Alerts, "台鐵");
+  if (res[3].status === "fulfilled") pick(Array.isArray(res[3].value) ? res[3].value : res[3].value.Alerts, "高鐵");
   alerts = al.slice(0, 4);
 }
 

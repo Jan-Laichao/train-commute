@@ -1,5 +1,5 @@
 // 只快取程式本身；火車資料一律即時向 TDX 查詢
-const C = "train-app-v1";
+const C = "train-app-v2";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(C).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => {
